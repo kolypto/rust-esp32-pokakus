@@ -12,13 +12,18 @@ use esp_hal::{
     timer::timg::TimerGroup,
     rng::Rng,
     interrupt::software::SoftwareInterruptControl,
+    gpio,
 };
 
 use embassy_executor::Spawner;
-use embassy_time::{Duration, Timer};
+use embassy_time::{
+    Duration, Timer
+};
 
-
-
+use pokakus::{
+    self,
+    button::wait_for_button_click,
+};
 
 
 #[allow(clippy::large_stack_frames)]
@@ -37,11 +42,33 @@ async fn main(spawner: Spawner) -> ! {
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
     defmt::info!("Embassy initialized!");
 
+    // Init GPIO: button
+    let button = gpio::Input::new(peripherals.GPIO9, gpio::InputConfig::default());
+
+    // Init GPIO: LED
+    let led = gpio::Output::new(peripherals.GPIO8, gpio::Level::High, gpio::OutputConfig::default());
+
     // TODO: Spawn some tasks
-    let _ = spawner;
+    spawner.must_spawn(pokakus::button::task_button_clicks(button));
+    spawner.must_spawn(led_task(led));
 
     loop {
-        defmt::info!("Hello world!");
+        defmt::info!("Running...");
         Timer::after(Duration::from_secs(1)).await;
+    }
+}
+
+/// Task: blinks LED
+#[embassy_executor::task]
+async fn led_task(mut led: gpio::Output<'static>) {
+    loop {
+        // Wait for button press event
+        wait_for_button_click().await;
+
+        // Blink 3 times
+        for _ in 0..6 {
+            led.toggle();
+            Timer::after(Duration::from_millis(100)).await;
+        }
     }
 }
