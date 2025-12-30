@@ -1,0 +1,36 @@
+{
+    "name": "rust-esp32",
+    "image": "kolypto/rust-esp32-devcontainer:latest",
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "lldb.executable": "/usr/bin/lldb",
+                "files.watcherExclude": {
+                    "**/target/**": true
+                },
+                "rust-analyzer.checkOnSave": false,
+                "[rust]": {
+                    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+                }
+            },
+            "extensions": [
+                "rust-lang.rust-analyzer",
+                "vadimcn.vscode-lldb",
+                "mutantdino.resourcemonitor",
+                "fill-labs.dependi",
+                "tamasfe.even-better-toml",
+                "yzhang.markdown-all-in-one",
+                "Wokwi.wokwi-vscode"
+            ]
+        },
+    },
+    "remoteUser": "ubuntu",
+    "mounts": [
+        "source=/dev/,target=/dev/,type=bind",
+    ],
+    "runArgs": [
+        "--privileged",
+    ],
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+    "workspaceFolder": "/workspace"
+}
