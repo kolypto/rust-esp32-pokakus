@@ -10,19 +10,13 @@ use defmt;
 use esp_hal::{
     clock::CpuClock,
     timer::timg::TimerGroup,
-    rng::Rng,
     interrupt::software::SoftwareInterruptControl,
     gpio,
 };
 
 use embassy_executor::Spawner;
 use embassy_time::{
-    Duration, Timer
-};
-
-use pokakus::{
-    self,
-    button::wait_for_button_click,
+    Timer,
 };
 
 
@@ -50,25 +44,21 @@ async fn main(spawner: Spawner) -> ! {
 
     // TODO: Spawn some tasks
     spawner.must_spawn(pokakus::button::task_button_clicks(button));
-    spawner.must_spawn(led_task(led));
+    spawner.must_spawn(pokakus::led::led_task(led));
 
     loop {
-        defmt::info!("Running...");
-        Timer::after(Duration::from_secs(1)).await;
-    }
-}
+        pokakus::button::wait_for_button_click().await;
+        pokakus::led::set_led_state(pokakus::led::LedState::PatientBlink);
+        pokakus::button::wait_for_button_click().await;
+        pokakus::led::set_led_state(pokakus::led::LedState::RapidBlink);
+        pokakus::button::wait_for_button_click().await;
+        pokakus::led::set_led_state(pokakus::led::LedState::Success);
+        pokakus::button::wait_for_button_click().await;
+        pokakus::led::set_led_state(pokakus::led::LedState::Failure);
+        pokakus::button::wait_for_button_click().await;
+        pokakus::led::set_led_state(pokakus::led::LedState::ViolentBlink);
 
-/// Task: blinks LED
-#[embassy_executor::task]
-async fn led_task(mut led: gpio::Output<'static>) {
-    loop {
-        // Wait for button press event
-        wait_for_button_click().await;
-
-        // Blink 3 times
-        for _ in 0..6 {
-            led.toggle();
-            Timer::after(Duration::from_millis(100)).await;
-        }
+        // defmt::info!("Running...");
+        // Timer::after_secs(1).await;
     }
 }
