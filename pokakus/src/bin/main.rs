@@ -8,6 +8,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 use defmt;
 use esp_hal::{
+    rng::Rng,
     clock::CpuClock,
     timer::timg::TimerGroup,
     interrupt::software::SoftwareInterruptControl,
@@ -34,7 +35,6 @@ async fn main(spawner: Spawner) -> ! {
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
-    defmt::info!("Embassy initialized!");
 
     // Init GPIO: button
     let button = gpio::Input::new(peripherals.GPIO9, gpio::InputConfig::default());
@@ -46,19 +46,19 @@ async fn main(spawner: Spawner) -> ! {
     spawner.must_spawn(pokakus::button::task_button_clicks(button));
     spawner.must_spawn(pokakus::led::led_task(led));
 
-    loop {
-        pokakus::button::wait_for_button_click().await;
-        pokakus::led::set_led_state(pokakus::led::LedState::PatientBlink);
-        pokakus::button::wait_for_button_click().await;
-        pokakus::led::set_led_state(pokakus::led::LedState::RapidBlink);
-        pokakus::button::wait_for_button_click().await;
-        pokakus::led::set_led_state(pokakus::led::LedState::Success);
-        pokakus::button::wait_for_button_click().await;
-        pokakus::led::set_led_state(pokakus::led::LedState::Failure);
-        pokakus::button::wait_for_button_click().await;
-        pokakus::led::set_led_state(pokakus::led::LedState::ViolentBlink);
+    // Init WiFi & network stack
+    let stack = defmt::expect!(
+        pokakus::wifi::start_wifi(&spawner, peripherals.WIFI).await,
+        "Init WiFi"
+    );
+    let rng = Rng::new();
+    let tls_seed = rng.random() as u64 | ((rng.random() as u64) << 32);
+    defmt::info!("Connected");
 
-        // defmt::info!("Running...");
-        // Timer::after_secs(1).await;
+    // Load the website
+    // load_url(stack, tls_seed).await;
+
+    loop {
+        Timer::after_secs(1).await;
     }
 }

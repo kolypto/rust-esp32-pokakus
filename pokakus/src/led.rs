@@ -40,9 +40,9 @@ pub fn set_led_state(state: LedState) {
 
 /// Task: blinks LED
 #[embassy_executor::task]
-pub async fn led_task(mut led: gpio::Output<'static>) {
+pub async fn led_task(led: gpio::Output<'static>) {
     let mut led = ActiveLowLed{ pin: led };
-    let mut current_state = LedState::PresenceBlink;
+    let mut current_state = LedState::PatientBlink;
 
     loop {
         // Decide on the blinking pattern:
@@ -79,11 +79,11 @@ pub async fn led_task(mut led: gpio::Output<'static>) {
                 }
             }
 
-            // This is the chance to get out of the hold
-            if !LED_STATE.signaled() {
-                // Go again
-                continue
+            // Update state.
+            if let Some(v) = LED_STATE.try_take() {
+                current_state = v;
             }
+            continue;
         }
 
         // Blink, but interrupt as soon as another signal comes
