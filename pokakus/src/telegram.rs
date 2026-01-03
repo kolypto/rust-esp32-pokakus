@@ -74,42 +74,44 @@ async fn telegram_send_message(stack: embassy_net::Stack<'_>, tls_seed: u64, sen
     // Request
     let mut buf = [0; 4096];
     let mut req = client.request(reqwless::request::Method::POST, url.as_str())
-        .await
-        .map_err(TelegramSendMessageError::PrepareRequest)?
+        .await?
         .content_type(ContentType::ApplicationJson)
         .body(body.as_bytes());
     let resp = req.send(&mut buf)
-        .await
-        .map_err(TelegramSendMessageError::SendRequest)?;
+        .await?;
 
     // Read response
     let response = resp.body().read_to_end()
-        .await
-        .map_err(TelegramSendMessageError::ReadResponse)?;
+        .await?;
     let resp_text = core::str::from_utf8(&response)
-        .map_err(|_| TelegramSendMessageError::DecodeUtf8Error)?;
+        .map_err(|_| TelegramSendMessageError::ResponseError)?;
 
     // Check for success
     if !resp_text.contains(r#""ok":true"#) {
-        defmt::error!("Failed to send Telegram message: {}", resp_text);
-        return Err(TelegramSendMessageError::ServerReturnedError)
+        defmt::error!("Telegram failed: {}", resp_text);
+        return Err(TelegramSendMessageError::ResponseError)
     }
 
     return Ok(())
 }
 
 
+// Error handling: only return as much info as the caller needs to have.
+// Everything else: log, don't return.
+// "Log generously, return sparingly."
 #[derive(Debug, defmt::Format)]
 pub enum TelegramSendMessageError {
-    SerdeJsonBody(serde_json_core::ser::Error),
-    PrepareRequest(reqwless::Error),
-    SendRequest(reqwless::Error),
-    ReadResponse(reqwless::Error),
-    DecodeUtf8Error,
-    ServerReturnedError,
+    InvalidArguments,
+    RequestError(reqwless::Error),
+    ResponseError,  // see logs
 }
 
-// // Auto-convert with From impls
+// Auto-convert with From impls
+impl From<reqwless::Error> for TelegramSendMessageError {
+    fn from(e: reqwless::Error) -> Self {
+        TelegramSendMessageError::RequestError(e)
+    }
+}
 // impl From<serde_json_core::Error> for TelegramSendMessageError {
 //     fn from(e: serde_json_core::Error) -> Self {
 //         TelegramSendMessageError::SerdeJsonBody(e)
