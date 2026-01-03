@@ -8,6 +8,7 @@ use reqwless::{
     client::{HttpClient, TlsConfig},
     headers::ContentType, request::RequestBuilder
 };
+use serde::Serialize;
 use embassy_net::{
     dns::DnsSocket,
     tcp::client::{TcpClient, TcpClientState},
@@ -68,15 +69,21 @@ async fn telegram_send_message(stack: embassy_net::Stack<'_>, tls_seed: u64, sen
     use core::fmt::Write;
     write!(url, "https://api.telegram.org/bot{}/sendMessage", BOT_TOKEN).unwrap();
     // write!(url, "https://jsonplaceholder.typicode.com/posts").unwrap();  // for testing
-    let mut body: String<256> = String::new();
-    write!(body, r#"{{"chat_id":{},"text":"{}"}}"#, send_to, message).unwrap();
+    // let mut body: String<256> = String::new();
+    // write!(body, r#"{{"chat_id":{},"text":"{}"}}"#, send_to, message).unwrap();
+    let msg = TelegramMessageInput {
+        chat_id: send_to,
+        text: message,
+    };
+    let mut body_buf = [0u8; 256];
+    let _body_len = serde_json_core::to_slice(&msg, &mut body_buf)?;
 
     // Request
     let mut buf = [0; 4096];
     let mut req = client.request(reqwless::request::Method::POST, url.as_str())
         .await?
         .content_type(ContentType::ApplicationJson)
-        .body(body.as_bytes());
+        .body(body_buf.as_slice());
     let resp = req.send(&mut buf)
         .await?;
 
@@ -112,11 +119,18 @@ impl From<reqwless::Error> for TelegramSendMessageError {
         TelegramSendMessageError::RequestError(e)
     }
 }
-// impl From<serde_json_core::Error> for TelegramSendMessageError {
-//     fn from(e: serde_json_core::Error) -> Self {
-//         TelegramSendMessageError::SerdeJsonBody(e)
-//     }
-// }
+impl From<serde_json_core::ser::Error> for TelegramSendMessageError {
+    fn from(_: serde_json_core::ser::Error) -> Self {
+        TelegramSendMessageError::InvalidArguments
+    }
+}
+
+
+#[derive(Serialize)]
+struct TelegramMessageInput<'a> {
+    chat_id: i64,
+    text: &'a str,
+}
 
 
 /* Telegram API:
