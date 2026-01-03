@@ -90,10 +90,12 @@ pub async fn led_task(led: gpio::Output<'static>) {
 
             // Revert back to a persistent state
             current_state = persistent_state;
+            defmt::info!("LED reverted to {:?}", current_state);
             continue;
         }
 
-        // Blink, but interrupt as soon as another signal comes
+        // Blink, but interrupt as soon as another signal comes.
+        // This means LED state changes are responsive even mid-blink.
         for (state, dur) in pattern {
             led.set(state);
 
@@ -103,7 +105,7 @@ pub async fn led_task(led: gpio::Output<'static>) {
                 select::Either::Second(new_state) => {
                     // State changed!
                     current_state = new_state;
-                    defmt::info!("LED state changed to {:?}", new_state);
+                    defmt::info!("LED state changed to {:?}", current_state);
                 }
             }
         }
