@@ -50,6 +50,7 @@ pub async fn task_telegram_sender(stack: embassy_net::Stack<'static>) {
         stack.wait_config_up().await;
 
         // Request
+        defmt::debug!("Telegram: sending message...");
         crate::led::set_led_state(crate::led::LedState::RapidBlink);
         match telegram_send_message(stack, send_to, message.as_str()).await {
             Ok(()) => {

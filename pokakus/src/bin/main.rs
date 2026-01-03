@@ -20,6 +20,10 @@ use embassy_time::{
 };
 
 
+// The message to send
+const MESSAGE_CONTENT: &str = env!("TELEGRAM_MESSAGE");
+
+
 #[allow(clippy::large_stack_frames)]
 #[esp_rtos::main]
 async fn main(spawner: Spawner) -> ! {
@@ -41,23 +45,30 @@ async fn main(spawner: Spawner) -> ! {
     // Init GPIO: LED
     let led = gpio::Output::new(peripherals.GPIO8, gpio::Level::High, gpio::OutputConfig::default());
 
-    // Spawn some tasks
-    spawner.must_spawn(pokakus::button::task_button_clicks(button));
-    spawner.must_spawn(pokakus::led::led_task(led));
-
     // Init WiFi & network stack
     let stack = defmt::expect!(
         pokakus::wifi::start_wifi(&spawner, peripherals.WIFI).await,
         "Init WiFi"
     );
 
-    // Telegram task
+    // Spawn some tasks
+    spawner.must_spawn(pokakus::button::task_button_clicks(button));
+    spawner.must_spawn(pokakus::led::led_task(led));
     spawner.must_spawn(pokakus::telegram::task_telegram_sender(stack));
-
-    // Send message: to a queue
-    pokakus::telegram::send_telegram_message("\":)\"");
+    spawner.must_spawn(task_main());
 
     loop {
         Timer::after_secs(1).await;
+    }
+}
+
+// Task: main logic
+// - Read button clicks
+// - Send them as Telegram messages
+#[embassy_executor::task()]
+pub async fn task_main() {
+    loop {
+        pokakus::button::wait_for_button_click().await;
+        pokakus::telegram::send_telegram_message(MESSAGE_CONTENT);
     }
 }

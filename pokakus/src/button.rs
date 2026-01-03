@@ -20,7 +20,7 @@ pub async fn wait_for_button_click() {
 /// Channel: button clicks.
 /// An empty message is sent along every time the button's clicked.
 //
-// A channel will send separate events. Unlike Signal, which will wake up all threads.
+// A channel will send separate events.
 static BUTTON_CLICKS: Channel<CriticalSectionRawMutex, (), 1> = Channel::new();
 
 /// Task: listen to button clicks
