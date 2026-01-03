@@ -8,7 +8,6 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 use defmt;
 use esp_hal::{
-    rng::Rng,
     clock::CpuClock,
     timer::timg::TimerGroup,
     interrupt::software::SoftwareInterruptControl,
@@ -42,7 +41,7 @@ async fn main(spawner: Spawner) -> ! {
     // Init GPIO: LED
     let led = gpio::Output::new(peripherals.GPIO8, gpio::Level::High, gpio::OutputConfig::default());
 
-    // TODO: Spawn some tasks
+    // Spawn some tasks
     spawner.must_spawn(pokakus::button::task_button_clicks(button));
     spawner.must_spawn(pokakus::led::led_task(led));
 
@@ -51,12 +50,9 @@ async fn main(spawner: Spawner) -> ! {
         pokakus::wifi::start_wifi(&spawner, peripherals.WIFI).await,
         "Init WiFi"
     );
-    let rng = Rng::new();
-    let tls_seed = rng.random() as u64 | ((rng.random() as u64) << 32);
-    defmt::info!("Connected");
 
-    // Load the website
-    // load_url(stack, tls_seed).await;
+    // Telegram task
+    spawner.must_spawn(pokakus::telegram::task_telegram_sender(stack));
 
     loop {
         Timer::after_secs(1).await;

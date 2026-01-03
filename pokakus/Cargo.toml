@@ -64,6 +64,7 @@ embassy-futures = { version = "0.1.2", features = ["defmt"] }
 anyhow = { version = "1.0.100", default-features = false }
 heapless = { version = "0.9.2", features = ["defmt"] }
 heapless_0_8 = { package = "heapless", version = "0.8.0"}
+reqwless = { version = "0.13.0", features = ["defmt", "embedded-tls", "alloc"] }
 
 
 [profile.dev]
@@ -73,6 +74,7 @@ opt-level = "s"
 
 [profile.release]
 codegen-units    = 1     # LLVM can perform better optimizations using a single thread
+# note: debug = true is okay - debuginfo isn't flashed to the device!
 debug            = 2
 debug-assertions = false
 incremental      = false

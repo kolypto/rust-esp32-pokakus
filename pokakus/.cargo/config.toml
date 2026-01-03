@@ -2,7 +2,8 @@
 runner = "espflash flash --monitor --chip esp32c3 --log-format defmt"
 
 [env]
-DEFMT_LOG="info"
+# DEFMT_LOG="info"
+DEFMT_LOG = "embassy_net=warn,info"
 ESPFLASH_BAUD='921600'
 
 [build]

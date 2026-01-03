@@ -1,6 +1,5 @@
 use defmt;
-use core::{net::Ipv4Addr, str::FromStr};
-use static_cell::{StaticCell, make_static};
+use static_cell::{make_static};
 
 use esp_hal::{
     rng::Rng,
@@ -9,11 +8,11 @@ use esp_radio::wifi;
 
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
-use embassy_net::{DhcpConfig, Ipv4Cidr, StaticConfigV4};
+use embassy_net::{DhcpConfig};
 
 
 // anyhow: return errors
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result};
 
 
 // Load WiFi credential from environment variables
