@@ -20,6 +20,8 @@ const SEND_TO: &str = env!("TELEGRAM_SEND_TO");
 // Task: send messages to Telegram
 #[embassy_executor::task()]
 pub async fn task_telegram_sender(stack: embassy_net::Stack<'static>) {
+    let send_to: i64 = SEND_TO.parse().expect("Failed to parse SEND_TO");
+
     // TLS needs a random value
     let rng = Rng::new();
     let tls_seed = {
@@ -32,13 +34,13 @@ pub async fn task_telegram_sender(stack: embassy_net::Stack<'static>) {
     stack.wait_config_up().await;
 
     // Request
-    if let Err(e) = telegram_send_message(stack, tls_seed, "💩").await {
+    if let Err(e) = telegram_send_message(stack, tls_seed, send_to, "💩").await {
         defmt::error!("Failed to send: {:?}", defmt::Debug2Format(&e));
     }
 }
 
 // Send a message
-async fn telegram_send_message(stack: embassy_net::Stack<'_>, tls_seed: u64, message: &str) -> anyhow::Result<(), reqwless::Error> {
+async fn telegram_send_message(stack: embassy_net::Stack<'_>, tls_seed: u64, send_to: i64, message: &str) -> Result<(), TelegramSendMessageError> {
     // Init TLS.
     // Quirks:
     // 1. TLS recommends that the rx buffer is at least 16640 bytes long: because this is the size of the biggest packet (2^14+256).
@@ -67,40 +69,51 @@ async fn telegram_send_message(stack: embassy_net::Stack<'_>, tls_seed: u64, mes
     write!(url, "https://api.telegram.org/bot{}/sendMessage", BOT_TOKEN).unwrap();
     // write!(url, "https://jsonplaceholder.typicode.com/posts").unwrap();  // for testing
     let mut body: String<256> = String::new();
-    write!(body, r#"{{"chat_id":{},"text":"{}"}}"#, SEND_TO, message).unwrap();
+    write!(body, r#"{{"chat_id":{},"text":"{}"}}"#, send_to, message).unwrap();
 
     // Request
     let mut buf = [0; 4096];
     let mut req = client.request(reqwless::request::Method::POST, url.as_str())
-        .await?
+        .await
+        .map_err(TelegramSendMessageError::PrepareRequest)?
         .content_type(ContentType::ApplicationJson)
         .body(body.as_bytes());
     let resp = req.send(&mut buf)
-        .await?;
+        .await
+        .map_err(TelegramSendMessageError::SendRequest)?;
 
     // Read response
-    let response = resp.body().read_to_end().await?;
-    let resp_text = core::str::from_utf8(&response)?;
+    let response = resp.body().read_to_end()
+        .await
+        .map_err(TelegramSendMessageError::ReadResponse)?;
+    let resp_text = core::str::from_utf8(&response)
+        .map_err(|_| TelegramSendMessageError::DecodeUtf8Error)?;
 
     // Check for success
-    if resp_text.contains(r#""ok":true"#) {
-        defmt::info!("Message sent!");
-        return Ok(())
-    } else {
-        defmt::error!("Failed: {}", resp_text);
+    if !resp_text.contains(r#""ok":true"#) {
+        defmt::error!("Failed to send Telegram message: {}", resp_text);
+        return Err(TelegramSendMessageError::ServerReturnedError)
     }
 
     return Ok(())
 }
 
 
-// #[derive(Debug, defmt::Format)]
-// pub enum TelegramSendMessageError {
-//     RequestFailed(reqwless::Error),
-//     InvalidResponse(core::error::Error),
-//     // Add context variants if needed
-//     HeaderParseFailed(reqwless::Error),
-//     BodyReadFailed(reqwless::Error),
+#[derive(Debug, defmt::Format)]
+pub enum TelegramSendMessageError {
+    SerdeJsonBody(serde_json_core::ser::Error),
+    PrepareRequest(reqwless::Error),
+    SendRequest(reqwless::Error),
+    ReadResponse(reqwless::Error),
+    DecodeUtf8Error,
+    ServerReturnedError,
+}
+
+// // Auto-convert with From impls
+// impl From<serde_json_core::Error> for TelegramSendMessageError {
+//     fn from(e: serde_json_core::Error) -> Self {
+//         TelegramSendMessageError::SerdeJsonBody(e)
+//     }
 // }
 
 
