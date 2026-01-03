@@ -50,8 +50,16 @@ pub async fn task_telegram_sender(stack: embassy_net::Stack<'static>) {
         stack.wait_config_up().await;
 
         // Request
-        if let Err(e) = telegram_send_message(stack, send_to, message.as_str()).await {
-            defmt::error!("Failed to send: {:?}", defmt::Debug2Format(&e));
+        crate::led::set_led_state(crate::led::LedState::RapidBlink);
+        match telegram_send_message(stack, send_to, message.as_str()).await {
+            Ok(()) => {
+                defmt::info!("Message sent!");
+                crate::led::set_led_state(crate::led::LedState::Success);
+            },
+            Err(e) => {
+                defmt::error!("Failed to send: {:?}", defmt::Debug2Format(&e));
+                crate::led::set_led_state(crate::led::LedState::Failure);
+            }
         }
     }
 }
@@ -124,7 +132,6 @@ async fn telegram_send_message(stack: embassy_net::Stack<'_>, send_to: i64, mess
     }
 
     // Ok
-    defmt::info!("Message sent!");
     return Ok(())
 }
 

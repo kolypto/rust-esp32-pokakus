@@ -84,17 +84,20 @@ async fn task_network(mut runner: embassy_net::Runner<'static, wifi::WifiDevice<
 #[embassy_executor::task]
 async fn task_keep_wifi_client_up(mut controller: wifi::WifiController<'static>) {
     loop {
+        // Set LED state
+        crate::led::set_led_state({
+            match wifi::sta_state() {
+                wifi::WifiStaState::Connected => crate::led::LedState::PresenceBlink,
+                _ => crate::led::LedState::PatientBlink,
+            }
+        });
+
         // 1. Check WiFi state
         // If it is in StaConnected, we wait until it gets disconnected.
-        match wifi::sta_state() {
-            wifi::WifiStaState::Connected => {
-                // wait until we're no longer connected
-                controller.wait_for_event(wifi::WifiEvent::StaDisconnected).await;
-
-                // wait more
-                Timer::after(Duration::from_secs(5)).await;
-            }
-            _ => {},
+        if wifi::sta_state() == wifi::WifiStaState::Connected {
+            // wait until we're no longer connected, then a bit more -- and reconnect
+            controller.wait_for_event(wifi::WifiEvent::StaDisconnected).await;
+            Timer::after(Duration::from_secs(5)).await;
         }
 
         // 2. Check if the WiFi controller is started.

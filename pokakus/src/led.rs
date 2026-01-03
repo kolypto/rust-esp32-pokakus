@@ -43,20 +43,28 @@ pub fn set_led_state(state: LedState) {
 pub async fn led_task(led: gpio::Output<'static>) {
     let mut led = ActiveLowLed{ pin: led };
     let mut current_state = LedState::PatientBlink;
+    let mut persistent_state = LedState::PatientBlink;
 
     loop {
         // Decide on the blinking pattern:
         // - on_duration: stay ON
         // - off_duration: stay OFF
-        // - hold: hold the state for this long
-        let (on_duration, off_duration, hold) = match current_state {
-            LedState::PresenceBlink     => (Duration::from_millis(  30), Duration::from_millis(3000), None),
-            LedState::PatientBlink      => (Duration::from_millis( 500), Duration::from_millis(1000), None),
-            LedState::RapidBlink        => (Duration::from_millis( 100), Duration::from_millis( 100), None),
-            LedState::ViolentBlink      => (Duration::from_millis(  30), Duration::from_millis(  70), None),
-            LedState::Success           => (Duration::from_millis(3000), Duration::from_millis(   0), Some(Duration::from_secs(3))),
-            LedState::Failure           => (Duration::from_millis(  30), Duration::from_millis(  70), Some(Duration::from_secs(3))),
+        // - hold: hold the state for this long, then revert to the previous persistent state
+        let (on_duration, off_duration, is_persistent, hold_then_revert) = match current_state {
+            // Persistent states
+            LedState::PresenceBlink     => (Duration::from_millis(  30), Duration::from_millis(3000), true, None),
+            LedState::PatientBlink      => (Duration::from_millis( 500), Duration::from_millis(1000), true, None),
+            LedState::RapidBlink        => (Duration::from_millis( 100), Duration::from_millis( 100), false, None),
+            LedState::ViolentBlink      => (Duration::from_millis(  30), Duration::from_millis(  70), false, None),
+            // Temporary states
+            LedState::Success           => (Duration::from_millis(3000), Duration::from_millis(   0), false, Some(Duration::from_secs(3))),
+            LedState::Failure           => (Duration::from_millis(  30), Duration::from_millis(  70), false, Some(Duration::from_secs(3))),
         };
+
+        // Remember the last persistent state
+        if is_persistent {
+            persistent_state = current_state;
+        }
 
         // Blink pattern
         let pattern = [
@@ -65,9 +73,10 @@ pub async fn led_task(led: gpio::Output<'static>) {
         ];
 
         // Hold the state?
-        // Problem: if a task fails, it sets `ViolentBlink` — but then the main task will immediately set `PresenceBlink` and reset it.
-        // Solution: some states "hold" the blinking pattern for a while.
-        if let Some(hold) = hold {
+        // Problem: some states are obviously persistent (i.e. WiFi state) whereas others are temporary:
+        //  the outcome of an HTTP request should "hold" for N seconds — then revert back to the WiFi state.
+        // Solution: some states "hold" the blinking pattern for a while then revert.
+        if let Some(hold) = hold_then_revert {
             let delay_start = Instant::now();
 
             // Keep blinking until it's passed
@@ -79,10 +88,8 @@ pub async fn led_task(led: gpio::Output<'static>) {
                 }
             }
 
-            // Update state.
-            if let Some(v) = LED_STATE.try_take() {
-                current_state = v;
-            }
+            // Revert back to a persistent state
+            current_state = persistent_state;
             continue;
         }
 
