@@ -54,6 +54,9 @@ async fn main(spawner: Spawner) -> ! {
     // Telegram task
     spawner.must_spawn(pokakus::telegram::task_telegram_sender(stack));
 
+    // Send message: to a queue
+    pokakus::telegram::send_telegram_message("\":)\"");
+
     loop {
         Timer::after_secs(1).await;
     }

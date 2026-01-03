@@ -13,35 +13,59 @@ use embassy_net::{
     dns::DnsSocket,
     tcp::client::{TcpClient, TcpClientState},
 };
+use embassy_sync::{
+    channel::Channel,
+    blocking_mutex::raw::CriticalSectionRawMutex,
+};
 
 // Bot token
 const BOT_TOKEN: &str = env!("TELEGRAM_BOT_TOKEN");
 const SEND_TO: &str = env!("TELEGRAM_SEND_TO");
+
+/// Send a message
+pub fn send_telegram_message(msg: &str){
+    // We only got a reference. To take ownership, we need a copy.
+    let owned: String<32> = String::try_from(msg).unwrap();
+    match MESSAGES_QUEUE.try_send(owned) {
+        Ok(()) => (),
+        Err(_) => defmt::error!("Queue full: cannot send message"),
+    }
+}
+
+/// Messages queue
+static MESSAGES_QUEUE: Channel<CriticalSectionRawMutex, String::<32>, 8> = Channel::new();
 
 // Task: send messages to Telegram
 #[embassy_executor::task()]
 pub async fn task_telegram_sender(stack: embassy_net::Stack<'static>) {
     let send_to: i64 = SEND_TO.parse().expect("Failed to parse SEND_TO");
 
+    // Input
+    let receiver = MESSAGES_QUEUE.receiver();
+    loop {
+        let message = receiver.receive().await;
+
+        // Wait for network
+        // TODO: timeout, warning?
+        stack.wait_config_up().await;
+
+        // Request
+        if let Err(e) = telegram_send_message(stack, send_to, message.as_str()).await {
+            defmt::error!("Failed to send: {:?}", defmt::Debug2Format(&e));
+        }
+    }
+}
+
+// Send a message
+async fn telegram_send_message(stack: embassy_net::Stack<'_>, send_to: i64, message: &str) -> Result<(), TelegramSendMessageError> {
     // TLS needs a random value
-    let rng = Rng::new();
+    let rng = Rng::new();  // it's ok: nothing's really initialized
     let tls_seed = {
         let mut bytes = [0; 8];
         rng.read(&mut bytes);
         u64::from_le_bytes(bytes)
     };
 
-    // Wait for network
-    stack.wait_config_up().await;
-
-    // Request
-    if let Err(e) = telegram_send_message(stack, tls_seed, send_to, "💩").await {
-        defmt::error!("Failed to send: {:?}", defmt::Debug2Format(&e));
-    }
-}
-
-// Send a message
-async fn telegram_send_message(stack: embassy_net::Stack<'_>, tls_seed: u64, send_to: i64, message: &str) -> Result<(), TelegramSendMessageError> {
     // Init TLS.
     // Quirks:
     // 1. TLS recommends that the rx buffer is at least 16640 bytes long: because this is the size of the biggest packet (2^14+256).
@@ -99,6 +123,8 @@ async fn telegram_send_message(stack: embassy_net::Stack<'_>, tls_seed: u64, sen
         return Err(TelegramSendMessageError::ResponseError)
     }
 
+    // Ok
+    defmt::info!("Message sent!");
     return Ok(())
 }
 
