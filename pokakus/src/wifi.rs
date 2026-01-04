@@ -31,10 +31,15 @@ pub async fn start_wifi(
 ) -> Result<embassy_net::Stack<'static>> {
     // Init controller
     let radio: &esp_radio::Controller<'static> = make_static!(esp_radio::init().context("Init radio")?);
-    let (wifi_controller, interfaces) =
+    let (mut wifi_controller, interfaces) =
         wifi::new(&radio, wifi_peripheral, Default::default())
             .context("Failed to initialize Wi-Fi controller")?;
     let wifi_interface = interfaces.sta;
+
+    // WiFi power saving.
+    // We only send occasional HTTP requests, so MAX should be fine.
+    // Otherwise the chip gets really hot.
+    wifi_controller.set_power_saving(wifi::PowerSaveMode::Maximum)?;
 
     // Network config: DHCP
     let net_config = embassy_net::Config::dhcpv4({
