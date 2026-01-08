@@ -1,0 +1,16 @@
+[env]
+# WiFi SSID
+WIFI_SSID=""
+
+# WiFi password
+WIFI_PASS=""
+
+# Telegram bot token
+# Where: @BotFather
+TELEGRAM_BOT_TOKEN=""
+
+# Send to this chat/channel
+TELEGRAM_SEND_TO=""
+
+# The message to send
+TELEGRAM_MESSAGE=":)"

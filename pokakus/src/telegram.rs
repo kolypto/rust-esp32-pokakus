@@ -160,7 +160,7 @@ impl From<serde_json_core::ser::Error> for TelegramSendMessageError {
 }
 
 
-#[derive(Serialize)]
+#[derive(Serialize, defmt::Format)]
 struct TelegramMessageInput<'a> {
     chat_id: i64,
     text: &'a str,
