@@ -5,6 +5,9 @@ WIFI_SSID=""
 # WiFi password
 WIFI_PASS=""
 
+# DHCP Hostname
+DHCP_HOSTNAME="pokakus"
+
 # Telegram bot token
 # Where: @BotFather
 TELEGRAM_BOT_TOKEN=""

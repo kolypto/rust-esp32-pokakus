@@ -1,6 +1,8 @@
 use defmt;
 use static_cell::{make_static};
 
+use core::str::FromStr;
+
 use esp_hal::{
     rng::Rng,
 };
@@ -19,6 +21,9 @@ use anyhow::{Context, Result};
 // Variables will be read *at compile time*
 const SSID: &str = env!("WIFI_SSID");
 const PASSWORD: &str = env!("WIFI_PASS");
+
+// Name yourself
+const DHCP_HOSTNAME: Option<&str> = option_env!("DHCP_HOSTNAME");
 
 // The number of sockets to allocate enough space for.
 const N_SOCKETS: usize = 7;
@@ -44,7 +49,11 @@ pub async fn start_wifi(
     // Network config: DHCP
     let net_config = embassy_net::Config::dhcpv4({
         let mut c = DhcpConfig::default();
-        c.hostname = Some("pokakus".parse().unwrap());  // feature="dhcpv4-hostname"
+        c.hostname = match DHCP_HOSTNAME {  // feature="dhcpv4-hostname"
+            None => None,
+            Some(v) => heapless_0_8::String::from_str(v).ok()
+        };
+        defmt::info!("DHCP_HOSTNAME: {}", c.hostname);
         c
     });
 
