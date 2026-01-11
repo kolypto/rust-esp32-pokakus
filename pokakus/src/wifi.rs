@@ -1,5 +1,4 @@
 use defmt;
-use static_cell::{make_static};
 
 use core::str::FromStr;
 
@@ -11,6 +10,8 @@ use esp_radio::wifi;
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use embassy_net::{DhcpConfig};
+
+use crate::mk_static;
 
 
 // anyhow: return errors
@@ -35,7 +36,7 @@ pub async fn start_wifi(
     wifi_peripheral: esp_hal::peripherals::WIFI<'static>,
 ) -> Result<embassy_net::Stack<'static>> {
     // Init controller
-    let radio: &esp_radio::Controller<'static> = make_static!(esp_radio::init().context("Init radio")?);
+    let radio: &esp_radio::Controller<'static> = mk_static!(esp_radio::Controller, esp_radio::init().context("Init radio")?);
     let (mut wifi_controller, interfaces) =
         wifi::new(&radio, wifi_peripheral, Default::default())
             .context("Failed to initialize Wi-Fi controller")?;
@@ -65,7 +66,7 @@ pub async fn start_wifi(
     let net_seed = rng.random() as u64 | ((rng.random() as u64) << 32);
     let (stack, runner) = embassy_net::new(
         wifi_interface, net_config,
-        make_static!(embassy_net::StackResources::<N_SOCKETS>::new()),
+        mk_static!(embassy_net::StackResources::<N_SOCKETS>, embassy_net::StackResources::<N_SOCKETS>::new()),
         net_seed,
     );
 
